@@ -84,11 +84,11 @@ def handle_invalid_usage (error):
     return response
 
 @app.errorhandler (500)
-def error_handler_500 (exception):
-    if isinstance(exception, dict):
-        error_elem = dict
-    else:
-        error_elem = {"error": str (exception)}
+def error_handler_500(exception):
+    error_elem = (
+        dict if isinstance(exception, dict) else {"error": str(exception)}
+    )
+
     return jsonify (error_elem), 500, {'Content-Type': 'application/json'}
 
 @app.errorhandler (400)
@@ -132,12 +132,11 @@ def request_follow_redirects(url, method, headers):
     conn = http.client.HTTPSConnection (o.netloc, context=ssl_context)
     path = o.path
     if o.query:
-        path = path + '?' + o.query
+        path = f'{path}?{o.query}'
     conn.request(method, path, "{}", headers)
     resp = conn.getresponse()
     resp_headers = dict(resp.getheaders())
-    location = resp_headers.get('Location')
-    if location:
+    if location := resp_headers.get('Location'):
         print(f"Redirecting to: {location}")
         return request_follow_redirects(location, method, headers)
     return resp
@@ -214,7 +213,7 @@ def getMUDFile(mud_url_str):
     logger.info (f"getMUDFile: url: {mud_url_str}")
     mud_url = urlparse(mud_url_str)
     mud_filepath = mud_cache_path / ((mud_url.netloc + mud_url.path).replace("/","_"))
-    mud_md_filepath = Path(str(mud_filepath) + ".md")
+    mud_md_filepath = Path(f"{str(mud_filepath)}.md")
     logger.info(f"getMUDFile: mud filepath for {mud_url_str}: {mud_filepath}...")
 
     mud_json = None
@@ -229,7 +228,7 @@ def getMUDFile(mud_url_str):
             cache_expiration_timestamp = datetime.fromtimestamp(cache_expiration_timestamp_str)
             logger.debug(f"getMUDFile: {mud_md_filepath} expiration is "
                          + cache_expiration_timestamp.isoformat())
-            if datetime.today() < cache_expiration_timestamp:
+            if datetime.now() < cache_expiration_timestamp:
                 logger.info(f"getMUDFile: LOADING {mud_url_str} from CACHE ({mud_filepath})")
                 mud_json = json.loads(mud_filepath.open().read())
             else:
@@ -255,12 +254,12 @@ def getMUDFile(mud_url_str):
 
         # Attempt to retrieve the MUD signature
         if mud_url.path.endswith(".json"):
-            base_path = mud_url.path[0:-5]
+            base_path = mud_url.path[:-5]
         else:
             base_path = mud_url.path
-        mudsig_url_str = mud_url.scheme+"://"+mud_url.netloc+base_path+".p7s"
+        mudsig_url_str = f"{mud_url.scheme}://{mud_url.netloc}{base_path}.p7s"
         if mud_url.query:
-            mudsig_url_str = mudsig_url_str + "?" + mudsig_url.query
+            mudsig_url_str = f"{mudsig_url_str}?{mudsig_url.query}"
 
         mudsig_url = urlparse(mudsig_url_str)
         # TODO: Check for a "mud-signature" element and use that path if/when it exists
@@ -299,7 +298,7 @@ def getMUDFile(mud_url_str):
         logger.info(f"cache-validity for {mud_url_str} is {cache_validity_hours} hours")
 
         cache_validity_delta = timedelta(hours=cache_validity_hours)
-        cache_validity_datetime = datetime.today() + cache_validity_delta
+        cache_validity_datetime = datetime.now() + cache_validity_delta
         logger.info(f"expiration for {mud_url_str} is {cache_validity_datetime.isoformat()}")
 
         mud_md_dict = {"expiration-timestamp": cache_validity_datetime.timestamp()}
@@ -322,7 +321,7 @@ def getACLs(version, mudObj, devAddress, controllerAddress):
     # the name of to-device-policy 
     toDevicePolicyName=mudObj["ietf-mud:mud"]["to-device-policy"]\
                              ["access-lists"]["access-list"][0]["name"]
- 
+
     #
     # In the case there are multiple access-lists for each direction
     #
@@ -346,7 +345,7 @@ def getACLs(version, mudObj, devAddress, controllerAddress):
             mudObj["ietf-access-control-list:acls"]["acl"][1]["aces"]["ace"]
         toDeviceACL= \
             mudObj["ietf-access-control-list:acls"]["acl"][0]["aces"]["ace"]
-    
+
     # aclData= '{"acls": [{"sip": "10.10.1.1", "dip": "0.0.0.0", "sport": 0, "dport":"80","action": "accept" }]}' 
 
     flowRules = {}
@@ -370,7 +369,7 @@ def getACLs(version, mudObj, devAddress, controllerAddress):
             mud_match = fromDeviceACL[i]['matches']['ietf-mud:mud']
             logger.info(f"Found ietf-mud:mud: {mud_match}" )
             (aclMudExtension, aclMudExtensionParam) = list(mud_match.items())[0]
-            
+
             # For all the no-param acl extensions, just use the extension name as the dest IP
             #  (with an optional param, colon-separated)
 
@@ -382,7 +381,7 @@ def getACLs(version, mudObj, devAddress, controllerAddress):
                 or "manufacturer" in aclMudExtension:
                 aclMudExtensionParam = list(mud_match.values())[0]
                 print(f"fromDeviceACL:   found MUD extension param: {aclMudExtensionParam}")
-                dip = aclMudExtension + ":" + aclMudExtensionParam
+                dip = f"{aclMudExtension}:{aclMudExtensionParam}"
             elif "controller" in aclMudExtension:
                 if (controllerAddress):
                     # TODO: Make this an associative lookup
